@@ -1,0 +1,145 @@
+---
+title: "11.19.20_Stats1_Project"
+author: "Zach Zaiken"
+date: "11/19/2020"
+output: html_document
+---
+
+```{r global_options}
+knitr::opts_chunk$set(fig.path='Figs/')
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Analysis 1:
+
+1. Restatement of Problem:
+
+    a) Construct a model in which the Sales Price of a home depends linearly on the square footage of the home (by 100 sq. ft. increments) and the neighborhood in which the home is located.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library (readr)
+
+house_urlfile="https://raw.githubusercontent.com/zz415/Stats1_Project/main/train.csv"
+
+
+house <-read_csv(url(house_urlfile))
+
+
+house2 <- house%>%mutate(Sqr_ft_100 = GrLivArea/100)%>%select(SalePrice,GrLivArea,Sqr_ft_100,Neighborhood)%>%filter(Neighborhood =="BrkSide" | Neighborhood =="NWAmes" | Neighborhood =="Edwards")
+
+
+house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit of Square Feet (per 100 ft^2) vs Sales Price")
+
+house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+facet_wrap(~ Neighborhood)+ggtitle("Scatterplots of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
+
+house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit  of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
+
+
+#one intercept one slope summary & confidence intervals
+housefit_1 <- lm(formula = SalePrice~Sqr_ft_100,data = house2)
+summary(housefit_1)
+confint(housefit_1)
+
+#multiple intercepts, one slope & confidence intervals
+housefit_2 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood,data = house2)
+summary(housefit_2)
+confint(housefit_2)
+
+#multiple intercepts, multiple slopes & confidence intervals
+housefit_3 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood + Sqr_ft_100*Neighborhood,data = house2)
+summary(housefit_3)
+confint(housefit_3)
+
+#ploting model fit
+
+#model 1
+par(mfrow=c(2,2))
+plot(housefit_1, which=c(1:3))
+
+#model 2
+par(mfrow=c(2,2))
+plot(housefit_2, which=c(1:3))
+
+#model 3
+par(mfrow=c(2,2))
+plot(housefit_3, which=c(1:3))
+
+
+
+##Histogram with normal curve
+
+
+
+##housefit_1 studentized residuals
+studres_housefit_1 <- rstudent(housefit_1)
+##Histogram
+hist(studres_housefit_1, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+##Create range of x-values for normal curve
+xfit2_housefit_1 <- seq(min(studres_housefit_1)-1, max(studres_housefit_1)+1, length=40)
+##Generate values from the normal distribution at the specified values
+yfit2_housefit_1 <- (dnorm(xfit2_housefit_1))
+##Add the normal curve
+lines(xfit2_housefit_1, yfit2_housefit_1, ylim=c(0,0.5))
+
+
+##housefit_2 studentized residuals
+studres_housefit_2 <- rstudent(housefit_2)
+##Histogram
+hist(studres_housefit_2, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+##Create range of x-values for normal curve
+xfit2_housefit_2 <- seq(min(studres_housefit_2)-1, max(studres_housefit_2)+1, length=40)
+##Generate values from the normal distribution at the specified values
+yfit2_housefit_2 <- (dnorm(xfit2_housefit_2))
+##Add the normal curve
+lines(xfit2_housefit_2, yfit2_housefit_2, ylim=c(0,0.5))
+
+
+
+##housefit_3 studentized residuals
+studres_housefit_3 <- rstudent(housefit_3)
+##Histogram
+hist(studres_housefit_3, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+##Create range of x-values for normal curve
+xfit2_housefit_3 <- seq(min(studres_housefit_3)-1, max(studres_housefit_3)+1, length=40)
+##Generate values from the normal distribution at the specified values
+yfit2_housefit_3 <- (dnorm(xfit2_housefit_3))
+##Add the normal curve
+lines(xfit2_housefit_3, yfit2_housefit_3, ylim=c(0,0.5))
+
+
+
+#install.packages("olsrr")
+library(olsrr)
+
+#cook's D and leverage housefit_1
+ols_plot_cooksd_chart(housefit_1)
+ols_plot_resid_lev(housefit_1)
+
+#cook's D and leverage housefit_2
+ols_plot_cooksd_chart(housefit_2)
+ols_plot_resid_lev(housefit_2)
+
+#cook's D and leverage housefit_3
+ols_plot_cooksd_chart(housefit_3)
+ols_plot_resid_lev(housefit_3)
+
+detach("package:olsrr", unload=TRUE)
+
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+
+
+
+
+```
