@@ -19,6 +19,23 @@ knitr::opts_chunk$set(echo = TRUE)
 1. Restatement of Problem:
 
     a) Construct a model in which the Sales Price of a home depends linearly on the square footage of the home (by 100 sq. ft. increments) and the neighborhood in which the home is located.
+    
+2. Assumptions:
+
+    a) Linearity: The scatter plots for sales price vs square footage suggest the relationship fits that of a linear model.  This is more apparent when color coded and broken out by neighborhood  The is further supported by the pearson correlation coefficients that show strong evidence of linear trend.
+  
+    b) Constant Variance: The residuals vs fitted plot resembles that of a random scatter plot centered around 0.  There may be a slight cluster between 100,000 & 150,000 but it is not significant.  There is no strong evidence that the data set does not have constant variance.
+  
+    c) Normality: The 
+  
+    d) Independence:
+
+3. Influential point analysis 
+
+    a) Cook's D & Leverage:
+    
+    
+    
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -30,16 +47,20 @@ house_urlfile="https://raw.githubusercontent.com/zz415/Stats1_Project/main/train
 house <-read_csv(url(house_urlfile))
 
 
-house2 <- house%>%mutate(Sqr_ft_100 = GrLivArea/100)%>%select(SalePrice,GrLivArea,Sqr_ft_100,Neighborhood)%>%filter(Neighborhood =="BrkSide" | Neighborhood =="NWAmes" | Neighborhood =="Edwards")
-
+house2 <- house%>%mutate(Sqr_ft_100 = GrLivArea/100)%>%select(Id,SalePrice,GrLivArea,Sqr_ft_100,Neighborhood)%>%filter(Neighborhood =="BrkSide" | Neighborhood =="NWAmes" | Neighborhood =="Edwards")
+house2 <- house2%>%mutate(row_number = row_number())
 
 house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit of Square Feet (per 100 ft^2) vs Sales Price")
 
 house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+facet_wrap(~ Neighborhood)+ggtitle("Scatterplots of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
 
 house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit  of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
+```
 
 
+### Analysis 1: Linear Fit models
+
+```{r message=FALSE, warning=FALSE}
 #one intercept one slope summary & confidence intervals
 housefit_1 <- lm(formula = SalePrice~Sqr_ft_100,data = house2)
 summary(housefit_1)
@@ -55,8 +76,26 @@ housefit_3 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood + Sqr_ft_100*Neighb
 summary(housefit_3)
 confint(housefit_3)
 
-#ploting model fit
 
+
+data.frame(
+Neighborhood = c("All","BrkSide","Edwards","NWAmes"),
+Pearson_Coefficient = c(
+cor(house2%>%select(Sqr_ft_100), house2%>%select(SalePrice), method = c("pearson")),
+cor(house2%>%filter(Neighborhood=='BrkSide')%>%select(Sqr_ft_100), house2%>%filter(Neighborhood=='BrkSide')%>%select(SalePrice), method = c("pearson")),
+cor(house2%>%filter(Neighborhood=='Edwards')%>%select(Sqr_ft_100), house2%>%filter(Neighborhood=='Edwards')%>%select(SalePrice), method = c("pearson")),
+cor(house2%>%filter(Neighborhood=='NWAmes')%>%select(Sqr_ft_100), house2%>%filter(Neighborhood=='NWAmes')%>%select(SalePrice), method = c("pearson"))
+
+))
+
+
+
+
+```
+
+### Analysis 1: ploting model fit
+
+```{r message=FALSE, warning=FALSE}
 #model 1
 par(mfrow=c(2,2))
 plot(housefit_1, which=c(1:3))
@@ -66,7 +105,7 @@ par(mfrow=c(2,2))
 plot(housefit_2, which=c(1:3))
 
 #model 3
-par(mfrow=c(2,2))
+par(mfrow=c(1,1))
 plot(housefit_3, which=c(1:3))
 
 
@@ -133,13 +172,153 @@ ols_plot_resid_lev(housefit_3)
 
 detach("package:olsrr", unload=TRUE)
 
+
+house2%>%filter(row_number=='201'|row_number=='224'|row_number=='113')%>%
+  mutate(Price_per_100sqft = SalePrice/Sqr_ft_100 )
+```
+
+
+### Analysis 1: Internal Cross Validation
+```{r message=FALSE, warning=FALSE}
+library(e1071)
+library(class)
+library(caret)
+#install.packages("Metrics")
+library(Metrics)
+library(tidyverse)
+
+iterations_RM_house2 = 500
+train_AdjR_RM_house2 = matrix(nrow = iterations_RM_house2)
+train_RMSE_RM_house2 = matrix(nrow = iterations_RM_house2)
+train_MSPE_RM_house2 = matrix(nrow = iterations_RM_house2)
+
+test_AdjR_RM_house2 = matrix(nrow = iterations_RM_house2)
+test_RMSE_RM_house2 = matrix(nrow = iterations_RM_house2)
+test_MSPE_RM_house2 = matrix(nrow = iterations_RM_house2)
+
+splitPerc_house2 = .7 #Training / Test split Percentage
+
+for(j in 1:iterations_RM_house2)
+{
+  
+  trainIndices_RM_house2 = sample(1:dim(house2)[1],round(splitPerc_house2 * dim(house2)[1]))
+  train_RM_house2 = house2[trainIndices_RM_house2,]
+  test_RM_house2 = house2[-trainIndices_RM_house2,]
+  
+  library(MASS)
+  
+train_RM_model_house2 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood + Sqr_ft_100*Neighborhood,data = house2)  
+
+detach("package:MASS", unload=TRUE)  
+
+
+train_RM_model_summary_house2 <- summary(train_RM_model_house2)
+
+ train_RM_Preds_house2 = predict(train_RM_model_house2, newdata = train_RM_house2) 
+ test_RM_Preds_house2 = predict(train_RM_model_house2, newdata = test_RM_house2) 
+
+
+  train_AdjR_RM_house2[j] = train_RM_model_summary_house2$adj.r.squared
+  train_RMSE_RM_house2[j] = rmse(train_RM_house2$SalePrice, train_RM_Preds_house2)
+
+test_RM_residuals_house2 <-test_RM_house2$SalePrice-test_RM_Preds_house2
+  
+ n_test_house2=length(test_RM_house2$SalePrice)
+k_test_house2=length(train_RM_model_house2$coefficients)-1 #Subtract one to ignore intercept
+SSE_test_house2=sum(test_RM_residuals_house2**2)
+SSyy_test_house2=sum((test_RM_house2$SalePrice-mean(test_RM_house2$SalePrice))**2)
+test_AdjR_house2 <- 1-(SSE_test_house2/SSyy_test_house2)*(n_test_house2-1)/(n_test_house2-(k_test_house2+1))
+ 
+test_AdjR_RM_house2[j] = test_AdjR_house2
+test_RMSE_RM_house2[j] = rmse(test_RM_house2$SalePrice, test_RM_Preds_house2)
+ 
+}
+
+
+Mean_train_AdjR_RM_house2 = colMeans(train_AdjR_RM_house2)
+Mean_train_RMSE_RM_house2 = colMeans(train_RMSE_RM_house2)
+Mean_test_AdjR_RM_house2 = colMeans(test_AdjR_RM_house2)
+Mean_test_RMSE_RM_house2 = colMeans(test_RMSE_RM_house2)
+ 
+ 
+ RM_results_house2 <- data.frame(
+   Measurenment = c("Train_Set_Adj_Rsquared_Avg","Train_Set_RMSE_Avg","Test_Set_Adj_Rsquared_Avg","Test_Set_RMSE_Avg"),
+   Value = c(Mean_train_AdjR_RM_house2,Mean_train_RMSE_RM_house2,Mean_test_AdjR_RM_house2,Mean_test_RMSE_RM_house2 ))
+
+ 
+ 
+ RM_results_house2
+
+
+
 ```
 
 
 
+
+
+# Analysis 2
+
 ```{r message=FALSE, warning=FALSE}
+library(olsrr)
+library(GGally)
+library(naniar)
+house3 <- house
 
 
 
+house5 <- (house3[, sapply(house3, class) != "character"])
+house5[is.na(house5)] = 0
+
+
+house6 <- (house3[, sapply(house3, class) == "character"])
+house6[is.na(house6)] = "NA"
+
+
+house8 <- cbind(house5,house6)
+
+
+
+library(MASS)
+
+
+housefit1 <- lm(SalePrice ~ ., data = house8)
+housefit2 <- lm(SalePrice ~ 1, data = house8)
+
+
+housefit_backward <- stepAIC(housefit1,direction="backward")
+housefit_forward <- stepAIC(housefit2,direction="forward",scope=list(upper=housefit1,lower=housefit2))
+housefit_stepwise <- stepAIC(housefit2,direction="both",scope=list(upper=housefit1,lower=housefit2))
+
+
+
+housefit_backward_summary <- summary(housefit_backward)
+
+
+housefit_forward_summary <- summary(housefit_forward)
+
+
+housefit_stepwise_summary <- summary(housefit_stepwise)
+
+
+detach("package:MASS", unload=TRUE)
+
+
+
+#miss_var_summary(house6)
+
+
+
+
+#alias(house3_model) 
+
+
+housefit_backward_summary$adj.r.squared
+housefit_forward_summary$adj.r.squared
+housefit_stepwise_summary$adj.r.squared
+
+housefit_backward_summary$sigma
+housefit_forward_summary$sigma
+housefit_stepwise_summary$sigma
 
 ```
