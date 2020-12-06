@@ -28,15 +28,19 @@ knitr::opts_chunk$set(echo = TRUE)
   
     c) Normality: The 
   
-    d) Independence:
+    d) Independence: The data does not suggest that the data is paired or related to eachother.  For the time being we will assume these are independent.
 
 3. Influential point analysis 
 
     a) Cook's D & Leverage:
     
-    
+      b) if the observation differs from the remaining data in its explanatory variable values in a sparsely represented region, then restrict the range
+      i) not many values of Y for range of x values
     
 
+
+
+# Code to Read in Test and Train Files
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library (readr)
@@ -47,34 +51,32 @@ house_urlfile="https://raw.githubusercontent.com/zz415/Stats1_Project/main/train
 house <-read_csv(url(house_urlfile))
 
 
-house2 <- house%>%mutate(Sqr_ft_100 = GrLivArea/100)%>%select(Id,SalePrice,GrLivArea,Sqr_ft_100,Neighborhood)%>%filter(Neighborhood =="BrkSide" | Neighborhood =="NWAmes" | Neighborhood =="Edwards")
-house2 <- house2%>%mutate(row_number = row_number())
-
-house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit of Square Feet (per 100 ft^2) vs Sales Price")
-
-house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+facet_wrap(~ Neighborhood)+ggtitle("Scatterplots of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
-
-house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit  of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
+house_test_urlfile="https://raw.githubusercontent.com/zz415/Stats1_Project/main/test.csv"
+house_test <-read_csv(url(house_test_urlfile))
 ```
 
 
-### Analysis 1: Linear Fit models
 
+#Analysis 1: Code to create per 100 sqr_ft and plot the scatter plots 3 potential linear models
+
+1. Model 1: One intercept and one slope
+2. Model 2: Multiple intercepts and one slope
+3. Model 3: Multiple intercepts and multiple slopes
 ```{r message=FALSE, warning=FALSE}
-#one intercept one slope summary & confidence intervals
-housefit_1 <- lm(formula = SalePrice~Sqr_ft_100,data = house2)
-summary(housefit_1)
-confint(housefit_1)
+library(knitr)
+#install.packages("kableExtra")
+library(kableExtra)
+library(cowplot)
 
-#multiple intercepts, one slope & confidence intervals
-housefit_2 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood,data = house2)
-summary(housefit_2)
-confint(housefit_2)
+house2 <- house%>%mutate(Sqr_ft_100 = GrLivArea/100)%>%select(Id,SalePrice,GrLivArea,Sqr_ft_100,Neighborhood)%>%filter(Neighborhood =="BrkSide" | Neighborhood =="NWAmes" | Neighborhood =="Edwards")
+house2 <- house2%>%mutate(row_number = row_number())
 
-#multiple intercepts, multiple slopes & confidence intervals
-housefit_3 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood + Sqr_ft_100*Neighborhood,data = house2)
-summary(housefit_3)
-confint(housefit_3)
+
+
+ house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit of Square Feet (per 100 ft^2) vs Sales Price")
+ house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+facet_wrap(~ Neighborhood)+ggtitle("Scatterplots of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
+ house2%>%ggplot(aes(x=Sqr_ft_100,y=SalePrice,color=Neighborhood))+geom_point()+geom_smooth(method = "lm")+ggtitle("Linear Fit  of Square Feet (per 100 ft^2) vs Sales Price by Neighborhood")
+
 
 
 
@@ -86,34 +88,173 @@ cor(house2%>%filter(Neighborhood=='BrkSide')%>%select(Sqr_ft_100), house2%>%filt
 cor(house2%>%filter(Neighborhood=='Edwards')%>%select(Sqr_ft_100), house2%>%filter(Neighborhood=='Edwards')%>%select(SalePrice), method = c("pearson")),
 cor(house2%>%filter(Neighborhood=='NWAmes')%>%select(Sqr_ft_100), house2%>%filter(Neighborhood=='NWAmes')%>%select(SalePrice), method = c("pearson"))
 
-))
-
-
-
+))%>%
+  kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Pearson Linear Coefficient for Neighborhoods" = 2))
 
 ```
 
-### Analysis 1: ploting model fit
 
+
+
+
+### Analysis 1: Linear Fit models: model 1
+
+```{r message=FALSE, warning=FALSE}
+
+#one intercept one slope summary & confidence intervals
+housefit_1 <- lm(formula = SalePrice~Sqr_ft_100,data = house2)
+housefit_1_summary <- summary(housefit_1)
+housefit_1_confint <-  confint(housefit_1)
+
+
+options(digits = 10, scipen = -2)
+
+fit1df <- (data.frame(housefit_1_summary$coefficients)%>%
+  rename(
+    'Standard Error' = Std..Error,
+   'T Value' = t.value,
+   'P-Value'= Pr...t..))
+fit1df$'P-Value' = ifelse(fit1df$'P-Value'< .0001,"< .0001",fit1df$'P-Value')
+
+fit1cidf <- data.frame(housefit_1_confint)%>%
+  rename(
+    'L95' = X2.5..,
+   'H95' = X97.5..)
+
+fit1df$CI_95_Low = fit1cidf$L95 
+fit1df$CI_95_High = fit1cidf$H95 
+
+fit1df%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Linear Fit Summary for Model 1" = 7))
+
+
+data.frame(
+Adjusted_R_Squared = c(housefit_1_summary$adj.r.squared),
+Residual_Standard_Error = c(housefit_1_summary$sigma),
+RMSE =  sqrt(mean(residuals(housefit_1)^2))
+
+)%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Fit Statistics for Model 1" = 3))
+  
+  
+
+```
+
+
+
+### Analysis 1: Linear Fit models: model 2
+
+```{r message=FALSE, warning=FALSE}
+
+#multiple intercepts, one slope & confidence intervals
+housefit_2 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood,data = house2)
+housefit_2_summary <- summary(housefit_2)
+housefit_2_confint <-  confint(housefit_2)
+
+
+options(digits = 10, scipen = -2)
+
+fit2df <- (data.frame(housefit_2_summary$coefficients)%>%
+  rename(
+    'Standard Error' = Std..Error,
+   'T Value' = t.value,
+   'P-Value'= Pr...t..))
+
+fit2df$'P-Value' = ifelse(fit2df$'P-Value'< .0001,"< .0001",fit2df$'P-Value')
+#fit2df$'P-Value' = formatC(fit2df$'P-Value', format = "e", digits = 4)
+
+fit2cidf <- data.frame(housefit_2_confint)%>%
+  rename(
+    'L95' = X2.5..,
+   'H95' = X97.5..)
+
+fit2df$CI_95_Low = fit2cidf$L95 
+fit2df$CI_95_High = fit2cidf$H95 
+
+fit2df%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Linear Fit Summary for Model 2" = 7))
+
+
+data.frame(
+Adjusted_R_Squared = c(housefit_2_summary$adj.r.squared),
+Residual_Standard_Error = c(housefit_2_summary$sigma),
+RMSE =  sqrt(mean(residuals(housefit_2)^2))
+
+)%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Fit Statistics for Model 2" = 3))
+  
+  
+```
+
+
+### Analysis 1: Linear Fit models: model 3
+
+```{r message=FALSE, warning=FALSE}
+#multiple intercepts, multiple slopes & confidence intervals
+housefit_3 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood + Sqr_ft_100*Neighborhood,data = house2)
+housefit_3_summary <- summary(housefit_3)
+housefit_3_confint <-  confint(housefit_3)
+
+options(digits = 10, scipen = -2)
+
+fit3df <- (data.frame(housefit_3_summary$coefficients)%>%
+  rename(
+    'Standard Error' = Std..Error,
+   'T Value' = t.value,
+   'P-Value'= Pr...t..))
+
+fit3df$'P-Value' = ifelse(fit3df$'P-Value'< .0001,"< .0001",fit3df$'P-Value')
+#fit2df$'P-Value' = formatC(fit2df$'P-Value', format = "e", digits = 4)
+
+fit3cidf <- data.frame(housefit_3_confint)%>%
+  rename(
+    'L95' = X2.5..,
+   'H95' = X97.5..)
+
+fit3df$CI_95_Low = fit3cidf$L95 
+fit3df$CI_95_High = fit3cidf$H95 
+
+fit3df%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Linear Fit Summary for Model 3" = 7))
+
+
+data.frame(
+Adjusted_R_Squared = c(housefit_3_summary$adj.r.squared),
+Residual_Standard_Error = c(housefit_3_summary$sigma),
+RMSE =  sqrt(mean(residuals(housefit_3)^2))
+
+)%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Fit Statistics for Model 3" = 3))
+
+```
+
+
+
+
+
+
+
+
+
+###Analysis 1: Residual and assumptions charts model 1
 ```{r message=FALSE, warning=FALSE}
 #model 1
 par(mfrow=c(2,2))
 plot(housefit_1, which=c(1:3))
-
-#model 2
-par(mfrow=c(2,2))
-plot(housefit_2, which=c(1:3))
-
-#model 3
-par(mfrow=c(1,1))
-plot(housefit_3, which=c(1:3))
-
-
-
-##Histogram with normal curve
-
-
-
 ##housefit_1 studentized residuals
 studres_housefit_1 <- rstudent(housefit_1)
 ##Histogram
@@ -125,8 +266,14 @@ xfit2_housefit_1 <- seq(min(studres_housefit_1)-1, max(studres_housefit_1)+1, le
 yfit2_housefit_1 <- (dnorm(xfit2_housefit_1))
 ##Add the normal curve
 lines(xfit2_housefit_1, yfit2_housefit_1, ylim=c(0,0.5))
+```
 
 
+###Analysis 1: Residual and assumptions charts model 2
+```{r message=FALSE, warning=FALSE}
+#model 2
+par(mfrow=c(2,2))
+plot(housefit_2, which=c(1:3))
 ##housefit_2 studentized residuals
 studres_housefit_2 <- rstudent(housefit_2)
 ##Histogram
@@ -138,10 +285,15 @@ xfit2_housefit_2 <- seq(min(studres_housefit_2)-1, max(studres_housefit_2)+1, le
 yfit2_housefit_2 <- (dnorm(xfit2_housefit_2))
 ##Add the normal curve
 lines(xfit2_housefit_2, yfit2_housefit_2, ylim=c(0,0.5))
+```
 
 
 
-##housefit_3 studentized residuals
+###Analysis 1: Residual and assumptions charts model 3
+```{r message=FALSE, warning=FALSE}
+#model 3
+par(mfrow=c(2,2))
+plot(housefit_3, which=c(1:3))
 studres_housefit_3 <- rstudent(housefit_3)
 ##Histogram
 hist(studres_housefit_3, freq=FALSE, main="Distribution of Studentized Residuals",
@@ -152,33 +304,36 @@ xfit2_housefit_3 <- seq(min(studres_housefit_3)-1, max(studres_housefit_3)+1, le
 yfit2_housefit_3 <- (dnorm(xfit2_housefit_3))
 ##Add the normal curve
 lines(xfit2_housefit_3, yfit2_housefit_3, ylim=c(0,0.5))
-
-
-
-#install.packages("olsrr")
-library(olsrr)
-
-#cook's D and leverage housefit_1
-ols_plot_cooksd_chart(housefit_1)
-ols_plot_resid_lev(housefit_1)
-
-#cook's D and leverage housefit_2
-ols_plot_cooksd_chart(housefit_2)
-ols_plot_resid_lev(housefit_2)
-
-#cook's D and leverage housefit_3
-ols_plot_cooksd_chart(housefit_3)
-ols_plot_resid_lev(housefit_3)
-
-detach("package:olsrr", unload=TRUE)
-
-
-house2%>%filter(row_number=='201'|row_number=='224'|row_number=='113')%>%
-  mutate(Price_per_100sqft = SalePrice/Sqr_ft_100 )
 ```
 
 
-### Analysis 1: Internal Cross Validation
+
+
+### Model 1 Cook's D and Leverage: one intercept and one slope
+```{r message=FALSE, warning=FALSE}
+#install.packages("olsrr")
+library(olsrr)
+#cook's D and leverage housefit_1
+ols_plot_cooksd_chart(housefit_1)
+ols_plot_resid_lev(housefit_1)
+```
+
+### Model 2 Cook's D and Leverage: multiple intercepts and one slope
+```{r message=FALSE, warning=FALSE}
+#cook's D and leverage housefit_2
+ols_plot_cooksd_chart(housefit_2)
+ols_plot_resid_lev(housefit_2)
+```
+
+
+### Model 3 Cook's D and Leverage: multiple intercepts and multiple slopes
+```{r message=FALSE, warning=FALSE}
+#cook's D and leverage housefit_3
+ols_plot_cooksd_chart(housefit_3)
+ols_plot_resid_lev(housefit_3)
+```
+
+### Analysis 1: Internal Cross Validation on model 1
 ```{r message=FALSE, warning=FALSE}
 library(e1071)
 library(class)
@@ -187,41 +342,183 @@ library(caret)
 library(Metrics)
 library(tidyverse)
 
-iterations_RM_house2 = 500
-train_AdjR_RM_house2 = matrix(nrow = iterations_RM_house2)
-train_RMSE_RM_house2 = matrix(nrow = iterations_RM_house2)
-train_MSPE_RM_house2 = matrix(nrow = iterations_RM_house2)
-
-test_AdjR_RM_house2 = matrix(nrow = iterations_RM_house2)
-test_RMSE_RM_house2 = matrix(nrow = iterations_RM_house2)
-test_MSPE_RM_house2 = matrix(nrow = iterations_RM_house2)
-
+set.seed(12) # set seed for reproduceable results
 splitPerc_house2 = .7 #Training / Test split Percentage
 
-for(j in 1:iterations_RM_house2)
-{
+ #assign test and training set
+  trainIndices_RM_house21 = sample(1:dim(house2)[1],round(splitPerc_house2 * dim(house2)[1]))
+  train_RM_house21 = house2[trainIndices_RM_house21,]
+  test_RM_house21 = house2[-trainIndices_RM_house21,]
+
   
+# fit the training set with model3   
+library(MASS)
+train_RM_model_house21 <- lm(formula = SalePrice~Sqr_ft_100,data = train_RM_house21)  
+detach("package:MASS", unload=TRUE)  
+
+
+train_RM_model_summary_house21 <- summary(train_RM_model_house21)
+train_RM_model_house21_confint <-  confint(train_RM_model_house21)
+
+
+ train_RM_Preds_house21 = predict(train_RM_model_house21, newdata = train_RM_house21) 
+ test_RM_Preds_house21 = predict(train_RM_model_house21, newdata = test_RM_house21)
+ 
+ 
+#adjRsquare and RMSE of training set
+ train_AdjR_RM_house21 = train_RM_model_summary_house21$adj.r.squared
+ train_RMSE_RM_house21 = rmse(train_RM_house21$SalePrice, train_RM_Preds_house21)
+ 
+
+ test_RM_residuals_house21 <-test_RM_house21$SalePrice-test_RM_Preds_house21
+  
+ n_test_house21=length(test_RM_house21$SalePrice)
+k_test_house21=length(train_RM_model_house21$coefficients)-1 #Subtract one to ignore intercept
+SSE_test_house21=sum(test_RM_residuals_house21**2)
+SSyy_test_house21=sum((test_RM_house21$SalePrice-mean(test_RM_house21$SalePrice))**2)
+test_AdjR_house21 <- 1-(SSE_test_house21/SSyy_test_house21)*(n_test_house21-1)/(n_test_house21-(k_test_house21+1))
+ 
+
+test_AdjR_RM_house21 = test_AdjR_house21
+test_RMSE_RM_house21 = rmse(test_RM_house21$SalePrice, test_RM_Preds_house21)
+ 
+  
+
+options(digits = 10, scipen = 2)
+
+
+RM_results_house21 <- data.frame(
+Measurenment = c("Adj_R_squared","Root Mean Square Error","Residual Standard Error")  
+,Training_Set_70 = c(train_AdjR_RM_house21,train_RMSE_RM_house21,"-" )  
+,Test_Set_30 = c(test_AdjR_RM_house21,test_RMSE_RM_house21,"-") 
+,Full_Set_100 = c(housefit_1_summary$adj.r.squared, sqrt(mean(residuals(housefit_1)^2)),sqrt( sum(residuals(housefit_1)^2) / housefit_1$df.residual )) 
+)%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Model 1 Internal Cross Validation Summary for 70/30 split" = 4))
+
+RM_results_house21
+
+##sqrt( sum(residuals(train_RM_model_house2)^2) / train_RM_model_house2$df.residual ) 
+
+```
+
+
+
+
+
+### Analysis 1: Internal Cross Validation on model 2
+```{r message=FALSE, warning=FALSE}
+library(e1071)
+library(class)
+library(caret)
+#install.packages("Metrics")
+library(Metrics)
+library(tidyverse)
+
+set.seed(12) # set seed for reproduceable results
+splitPerc_house2 = .7 #Training / Test split Percentage
+
+ #assign test and training set
+  trainIndices_RM_house22 = sample(1:dim(house2)[1],round(splitPerc_house2 * dim(house2)[1]))
+  train_RM_house22 = house2[trainIndices_RM_house22,]
+  test_RM_house22 = house2[-trainIndices_RM_house22,]
+
+  
+# fit the training set with model3   
+library(MASS)
+train_RM_model_house22 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood,data = train_RM_house22)  
+detach("package:MASS", unload=TRUE)  
+
+
+train_RM_model_summary_house22 <- summary(train_RM_model_house22)
+train_RM_model_house22_confint <-  confint(train_RM_model_house22)
+
+
+ train_RM_Preds_house22 = predict(train_RM_model_house22, newdata = train_RM_house22) 
+ test_RM_Preds_house22 = predict(train_RM_model_house22, newdata = test_RM_house22)
+ 
+ 
+#adjRsquare and RMSE of training set
+ train_AdjR_RM_house22 = train_RM_model_summary_house22$adj.r.squared
+ train_RMSE_RM_house22 = rmse(train_RM_house22$SalePrice, train_RM_Preds_house22)
+ 
+
+ test_RM_residuals_house22 <-test_RM_house22$SalePrice-test_RM_Preds_house22
+  
+ n_test_house22=length(test_RM_house22$SalePrice)
+k_test_house22=length(train_RM_model_house22$coefficients)-1 #Subtract one to ignore intercept
+SSE_test_house22=sum(test_RM_residuals_house22**2)
+SSyy_test_house22=sum((test_RM_house22$SalePrice-mean(test_RM_house22$SalePrice))**2)
+test_AdjR_house22 <- 1-(SSE_test_house22/SSyy_test_house22)*(n_test_house22-1)/(n_test_house22-(k_test_house22+1))
+ 
+
+test_AdjR_RM_house22 = test_AdjR_house22
+test_RMSE_RM_house22 = rmse(test_RM_house22$SalePrice, test_RM_Preds_house22)
+ 
+  
+
+options(digits = 10, scipen = 2)
+
+
+RM_results_house22 <- data.frame(
+Measurenment = c("Adj_R_squared","Root Mean Square Error","Residual Standard Error")  
+,Training_Set_70 = c(train_AdjR_RM_house22,train_RMSE_RM_house22,"-" )  
+,Test_Set_30 = c(test_AdjR_RM_house22,test_RMSE_RM_house22,"-") 
+,Full_Set_100 = c(housefit_2_summary$adj.r.squared, sqrt(mean(residuals(housefit_2)^2)),sqrt( sum(residuals(housefit_2)^2) / housefit_2$df.residual )) 
+)%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Model 2 Internal Cross Validation Summary for 70/30 split" = 4))
+
+RM_results_house22
+
+##sqrt( sum(residuals(train_RM_model_house2)^2) / train_RM_model_house2$df.residual ) 
+
+```
+
+
+
+
+
+### Analysis 1: Internal Cross Validation on model 3
+```{r message=FALSE, warning=FALSE}
+library(e1071)
+library(class)
+library(caret)
+#install.packages("Metrics")
+library(Metrics)
+library(tidyverse)
+
+set.seed(12) # set seed for reproduceable results
+splitPerc_house2 = .7 #Training / Test split Percentage
+
+ #assign test and training set
   trainIndices_RM_house2 = sample(1:dim(house2)[1],round(splitPerc_house2 * dim(house2)[1]))
   train_RM_house2 = house2[trainIndices_RM_house2,]
   test_RM_house2 = house2[-trainIndices_RM_house2,]
-  
-  library(MASS)
-  
-train_RM_model_house2 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood + Sqr_ft_100*Neighborhood,data = house2)  
 
+  
+# fit the training set with model3   
+library(MASS)
+train_RM_model_house2 <- lm(formula = SalePrice~Sqr_ft_100+Neighborhood + Sqr_ft_100*Neighborhood,data = train_RM_house2)  
 detach("package:MASS", unload=TRUE)  
 
 
 train_RM_model_summary_house2 <- summary(train_RM_model_house2)
+train_RM_model_house2_confint <-  confint(train_RM_model_house2)
+
 
  train_RM_Preds_house2 = predict(train_RM_model_house2, newdata = train_RM_house2) 
- test_RM_Preds_house2 = predict(train_RM_model_house2, newdata = test_RM_house2) 
+ test_RM_Preds_house2 = predict(train_RM_model_house2, newdata = test_RM_house2)
+ 
+ 
+#adjRsquare and RMSE of training set
+ train_AdjR_RM_house2 = train_RM_model_summary_house2$adj.r.squared
+ train_RMSE_RM_house2 = rmse(train_RM_house2$SalePrice, train_RM_Preds_house2)
+ 
 
-
-  train_AdjR_RM_house2[j] = train_RM_model_summary_house2$adj.r.squared
-  train_RMSE_RM_house2[j] = rmse(train_RM_house2$SalePrice, train_RM_Preds_house2)
-
-test_RM_residuals_house2 <-test_RM_house2$SalePrice-test_RM_Preds_house2
+ test_RM_residuals_house2 <-test_RM_house2$SalePrice-test_RM_Preds_house2
   
  n_test_house2=length(test_RM_house2$SalePrice)
 k_test_house2=length(train_RM_model_house2$coefficients)-1 #Subtract one to ignore intercept
@@ -229,25 +526,116 @@ SSE_test_house2=sum(test_RM_residuals_house2**2)
 SSyy_test_house2=sum((test_RM_house2$SalePrice-mean(test_RM_house2$SalePrice))**2)
 test_AdjR_house2 <- 1-(SSE_test_house2/SSyy_test_house2)*(n_test_house2-1)/(n_test_house2-(k_test_house2+1))
  
-test_AdjR_RM_house2[j] = test_AdjR_house2
-test_RMSE_RM_house2[j] = rmse(test_RM_house2$SalePrice, test_RM_Preds_house2)
+
+test_AdjR_RM_house2 = test_AdjR_house2
+test_RMSE_RM_house2 = rmse(test_RM_house2$SalePrice, test_RM_Preds_house2)
  
-}
+  
+
+options(digits = 10, scipen = 2)
 
 
-Mean_train_AdjR_RM_house2 = colMeans(train_AdjR_RM_house2)
-Mean_train_RMSE_RM_house2 = colMeans(train_RMSE_RM_house2)
-Mean_test_AdjR_RM_house2 = colMeans(test_AdjR_RM_house2)
-Mean_test_RMSE_RM_house2 = colMeans(test_RMSE_RM_house2)
- 
- 
- RM_results_house2 <- data.frame(
-   Measurenment = c("Train_Set_Adj_Rsquared_Avg","Train_Set_RMSE_Avg","Test_Set_Adj_Rsquared_Avg","Test_Set_RMSE_Avg"),
-   Value = c(Mean_train_AdjR_RM_house2,Mean_train_RMSE_RM_house2,Mean_test_AdjR_RM_house2,Mean_test_RMSE_RM_house2 ))
+RM_results_house2 <- data.frame(
+Measurenment = c("Adj_R_squared","Root Mean Square Error","Residual Standard Error")  
+,Training_Set_70 = c(train_AdjR_RM_house2,train_RMSE_RM_house2,"-" )  
+,Test_Set_30 = c(test_AdjR_RM_house2,test_RMSE_RM_house2,"-") 
+,Full_Set_100 = c(housefit_3_summary$adj.r.squared, sqrt(mean(residuals(housefit_3)^2)),sqrt( sum(residuals(housefit_3)^2) / housefit_3$df.residual )) 
+)%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Model 3 Internal Cross Validation Summary for 70/30 split" = 4))
 
- 
- 
- RM_results_house2
+RM_results_house2
+
+##sqrt( sum(residuals(train_RM_model_house2)^2) / train_RM_model_house2$df.residual ) 
+
+```
+
+
+
+
+# Analysis 2: plot the data
+```{r message=FALSE, warning=FALSE}
+
+#plot the data
+house5%>%select(SalePrice,GrLivArea,OverallQual,OverallCond,TotRmsAbvGrd)%>%ggpairs()
+house5%>%select(SalePrice,YearBuilt,FullBath,YearBuilt,YearRemodAdd)%>%ggpairs()
+```
+
+
+
+
+
+
+# Analysis 2 Fit the model
+### cleanup data to make sure factoring of categorical variables works correctly in LM model.
+```{r message=FALSE, warning=FALSE}
+library(olsrr)
+library(GGally)
+library(naniar)
+library(tidyverse)
+
+
+#miss_var_summary(house)
+
+house3 <- house
+
+
+#sets NA values of numbers = 0
+house5 <- (house3[, sapply(house3, class) != "character"])
+house5[is.na(house5)] = 0
+
+
+#sets NA values of characters as "NA", making it a level
+house6 <- (house3[, sapply(house3, class) == "character"])
+house6[is.na(house6)] = "NA"
+
+
+#bind the two datasets together
+house8 <- cbind(house5,house6)
+
+
+#creates 1 row to be insterted that is all 0 for continuous variables & all "NA" for categorical variables, this is to ensure every possible factoring is accounted for in linear model fitting
+fill1 = data.frame(matrix(nrow=1, ncol = ncol(house8)))
+fill1<- replace(fill1, 1:ncol(house5),0)
+fill1<- replace(fill1, ncol(house6):ncol(house8),"NA")
+
+
+#binds additional row 
+house9 <- rbind(house8,setNames(fill1,names(house8)))
+house9[is.na(house9)] = "NA"
+```
+
+
+
+# Pearson linear coefficient of continuous variables & count of categorical variable
+```{r message=FALSE, warning=FALSE}
+
+
+house5_names = data.frame(variable = names(house5))
+house5_names <- house5_names%>%filter(variable != 'Id' & variable != 'SalePrice')
+
+
+#pearson
+data.frame(cor(house5%>%select(house5_names[,1]), house5%>%select(SalePrice), method = c("pearson")))%>%
+  rename(
+    Pearson_Coefficient_with_SalePrice = SalePrice
+    
+  )%>%arrange(desc(abs(Pearson_Coefficient_with_SalePrice)))%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Linear Fit Assessment of Continuos Variables" = 2))
+
+
+
+#categorical
+(((house6%>%mutate(
+ id=row_number() 
+))%>%pivot_longer(!id,names_to = 'variable',values_to='value'))%>%distinct(variable,value))%>%
+  group_by(variable)%>%summarize(Unique_Count_of_values=n())%>%arrange(desc(Unique_Count_of_values))%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Categorical Variable Analysis" = 2))
 
 
 
@@ -257,68 +645,694 @@ Mean_test_RMSE_RM_house2 = colMeans(test_RMSE_RM_house2)
 
 
 
-# Analysis 2
 
+
+
+
+### running the 3 linear models and creating summaries
 ```{r message=FALSE, warning=FALSE}
-library(olsrr)
-library(GGally)
-library(naniar)
-house3 <- house
-
-
-
-house5 <- (house3[, sapply(house3, class) != "character"])
-house5[is.na(house5)] = 0
-
-
-house6 <- (house3[, sapply(house3, class) == "character"])
-house6[is.na(house6)] = "NA"
-
-
-house8 <- cbind(house5,house6)
-
-
-
+#fit the 3 selection models
 library(MASS)
 
-
-housefit1 <- lm(SalePrice ~ ., data = house8)
-housefit2 <- lm(SalePrice ~ 1, data = house8)
+#fits the minimum and maximum models for forward,backward and stepwise selection
+housefit1 <- lm(SalePrice ~ ., data = house9)
+housefit2 <- lm(SalePrice ~ 1, data = house9)
+housefitcustom <- lm(formula = SalePrice ~ 
+                       OverallQual+GrLivArea+GarageCars+GarageArea+TotalBsmtSF+`1stFlrSF`+FullBath+TotRmsAbvGrd+YearBuilt+YearRemodAdd+
+                     Neighborhood+Exterior2nd+Exterior1st+Condition1+SaleType+Condition2+HouseStyle+RoofMatl+BsmtFinType1+BsmtFinType2
+                     
+                     , data = house9)
 
 
 housefit_backward <- stepAIC(housefit1,direction="backward")
 housefit_forward <- stepAIC(housefit2,direction="forward",scope=list(upper=housefit1,lower=housefit2))
 housefit_stepwise <- stepAIC(housefit2,direction="both",scope=list(upper=housefit1,lower=housefit2))
 
-
-
-housefit_backward_summary <- summary(housefit_backward)
-
-
-housefit_forward_summary <- summary(housefit_forward)
-
-
-housefit_stepwise_summary <- summary(housefit_stepwise)
-
-
 detach("package:MASS", unload=TRUE)
+#housefit_stepwise <- step(housefit1)
+#
+#housefit_stepwisef <- stepAIC(housefit1,direction="both")
 
+#library(stats)
+#step_fit <- step(housefit1)
+#help(stepaic)
 
+#create lm summary files
+housefit_backward_summary <- summary(housefit_backward)
+housefit_forward_summary <- summary(housefit_forward)
+housefit_stepwise_summary <- summary(housefit_stepwise)
+housefitcustom_summary <- summary(housefitcustom)
 
 #miss_var_summary(house6)
-
-
-
-
 #alias(house3_model) 
 
 
-housefit_backward_summary$adj.r.squared
-housefit_forward_summary$adj.r.squared
-housefit_stepwise_summary$adj.r.squared
 
-housefit_backward_summary$sigma
-housefit_forward_summary$sigma
-housefit_stepwise_summary$sigma
+
+```
+
+
+
+
+
+
+
+# Analysis 2 Fit the model variable selection
+
+```{r message=FALSE, warning=FALSE}
+
+house9_class <- data.frame(Explanatory_Variables = stri_trans_tolower(names(house9)), Variable_Type = sapply(house9, class))
+house9_class2 <- data.frame(Explanatory_Variables= house9_class$Explanatory_Variables,Variable_Type = house9_class$Variable_Type)
+
+house9_class2 <- house9_class2%>%filter(Explanatory_Variables!='saleprice'&Explanatory_Variables!='id')
+
+
+#variables used in backwards selection
+housefit_backward_call <- housefit_backward_summary$call
+housefit_backward_call2 <- housefit_backward_call$formula
+housefit_backward_call3 <- str_replace_all(housefit_backward_call2, "\\+","")
+housefit_backward_call4 <- data.frame(explanatory_variables = unlist(stri_extract_all_words(stri_trans_tolower(housefit_backward_call3))),Backward_Selection="yes")
+
+#variables used in forward selection
+housefit_forward_call <- housefit_forward_summary$call
+housefit_forward_call2 <- housefit_forward_call$formula
+housefit_forward_call3 <- str_replace_all(housefit_forward_call2, "\\+","")
+housefit_forward_call4 <- data.frame(explanatory_variables = unlist(stri_extract_all_words(stri_trans_tolower(housefit_forward_call3))),Forward_Selection="yes")
+
+#variables used in stepwise selection
+housefit_stepwise_call <- housefit_stepwise_summary$call
+housefit_stepwise_call2 <- housefit_stepwise_call$formula
+housefit_stepwise_call3 <- str_replace_all(housefit_stepwise_call2, "\\+","")
+housefit_stepwise_call4 <- data.frame(explanatory_variables = unlist(stri_extract_all_words(stri_trans_tolower(housefit_stepwise_call3))),Stepwise_Selection="yes")
+
+#variables used in custom selection
+housefit_custom_call <- housefitcustom_summary$call
+housefit_custom_call2 <- toString(housefit_custom_call$formula)
+housefit_custom_call3 <- str_replace_all(string=housefit_custom_call2, "\\+","")
+housefit_custom_call4 <- data.frame(explanatory_variables = unlist(stri_extract_all_words(stri_trans_tolower(housefit_custom_call3))),Custom_Selection="yes")
+
+
+
+housefitcustom_summary <- summary(housefitcustom)
+
+
+
+lj1 <- left_join(house9_class2,housefit_forward_call4,by=c("Explanatory_Variables"="explanatory_variables"))
+
+lj2 <- left_join(lj1,housefit_backward_call4,by=c("Explanatory_Variables"="explanatory_variables"))
+  
+lj3 <- left_join(lj2,housefit_stepwise_call4,by=c("Explanatory_Variables"="explanatory_variables"))  
+  
+lj4 <- left_join(lj3,housefit_custom_call4,by=c("Explanatory_Variables"="explanatory_variables")) 
+
+lj4[is.na(lj4)] <- ""
+
+
+lj4%>%filter(Variable_Type=="numeric")%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Fit the Model: Variable Selection" = 6))
+
+
+lj4%>%filter(Variable_Type!="numeric")%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Fit the Model: Variable Selection" = 6))
+```
+
+
+#Analysis 2 forward model Residual charts
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+plot(housefit_forward, which=c(1:3))
+studres_housefit_forward <- rstudent(housefit_forward)
+##Histogram
+hist(studres_housefit_forward, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+##Create range of x-values for normal curve
+xfit2_housefit_forward <- seq(min(na.omit(studres_housefit_forward))-1, max(na.omit(studres_housefit_forward))+1, length=40)
+##Generate values from the normal distribution at the specified values
+yfit2_housefit_forward<- (dnorm(xfit2_housefit_forward))
+##Add the normal curve
+lines(xfit2_housefit_forward, yfit2_housefit_forward, ylim=c(0,0.5))
+```
+
+
+
+#Analysis 2 backward model Residual charts
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+plot(housefit_backward, which=c(1:3))
+studres_housefit_backward <- rstudent(housefit_backward)
+##Histogram
+hist(studres_housefit_backward, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+##Create range of x-values for normal curve
+xfit2_housefit_backward <- seq(min(na.omit(studres_housefit_backward))-1, max(na.omit(studres_housefit_backward))+1, length=40)
+##Generate values from the normal distribution at the specified values
+yfit2_housefit_backward<- (dnorm(xfit2_housefit_backward))
+##Add the normal curve
+lines(xfit2_housefit_backward, yfit2_housefit_backward, ylim=c(0,0.5))
+```
+
+
+#Analysis 2 stepwise model Residual charts
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+plot(housefit_stepwise, which=c(1:3))
+studres_housefit_stepwise <- rstudent(housefit_stepwise)
+##Histogram
+hist(studres_housefit_stepwise, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+##Create range of x-values for normal curve
+xfit2_housefit_stepwise <- seq(min(na.omit(studres_housefit_stepwise))-1, max(na.omit(studres_housefit_stepwise))+1, length=40)
+##Generate values from the normal distribution at the specified values
+yfit2_housefit_stepwise<- (dnorm(xfit2_housefit_stepwise))
+##Add the normal curve
+lines(xfit2_housefit_stepwise, yfit2_housefit_stepwise, ylim=c(0,0.5))
+```
+
+
+#Analysis 2 custom model Residual charts
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+plot(housefitcustom, which=c(1:3))
+studres_housefitcustom <- rstudent(housefitcustom)
+##Histogram
+hist(studres_housefitcustom, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+##Create range of x-values for normal curve
+xfit2_housefitcustom<- seq(min(na.omit(studres_housefitcustom))-1, max(na.omit(studres_housefitcustom))+1, length=40)
+##Generate values from the normal distribution at the specified values
+yfit2_housefitcustom<- (dnorm(xfit2_housefitcustom))
+##Add the normal curve
+lines(xfit2_housefitcustom, yfit2_housefitcustom, ylim=c(0,0.5))
+```
+
+
+
+#Analysis 2 forward cook's D & Leverage
+```{r message=FALSE, warning=FALSE}
+ols_plot_cooksd_chart(housefit_forward)
+ols_plot_resid_lev(housefit_forward)
+```
+
+
+#Analysis 2 backward cook's D & Leverage
+```{r message=FALSE, warning=FALSE}
+ols_plot_cooksd_chart(housefit_backward)
+ols_plot_resid_lev(housefit_backward)
+
+```
+
+
+#Analysis 2 stepwise cook's D & Leverage
+```{r message=FALSE, warning=FALSE}
+ols_plot_cooksd_chart(housefit_stepwise)
+ols_plot_resid_lev(housefit_stepwise)
+```
+
+
+#Analysis 2 custom cook's D & Leverage
+```{r message=FALSE, warning=FALSE}
+ols_plot_cooksd_chart(housefitcustom)
+ols_plot_resid_lev(housefitcustom)
+```
+
+
+# Analysis 2 forward cross validation
+
+```{r message=FALSE, warning=FALSE}
+
+library(e1071)
+library(class)
+library(caret)
+#install.packages("Metrics")
+library(Metrics)
+library(tidyverse)
+
+
+set.seed(4) # set seed for reproduceable results
+splitPerc_house_fcv = .7 #Training / Test split Percentage
+
+#assign test and training set
+  trainIndices_RM_house9_fcv = sample(1:dim(house8)[1],round(splitPerc_house_fcv * dim(house8)[1]))
+  train_RM_house9_fcv = house8[trainIndices_RM_house9_fcv,]
+  test_RM_house9_fcv = house8[-trainIndices_RM_house9_fcv,]
+
+  
+train_RM_house9_fcv <- rbind(train_RM_house9_fcv,setNames(fill1,names(train_RM_house9_fcv)))
+train_RM_house9_fcv[is.na(train_RM_house9_fcv)] = "NA"
+
+test_RM_house9_fcv <- rbind(test_RM_house9_fcv,setNames(fill1,names(test_RM_house9_fcv)))
+test_RM_house9_fcv[is.na(test_RM_house9_fcv)] = "NA"
+  
+  
+
+    
+ train_RM_house9_fcv_char <- (train_RM_house9_fcv[, sapply(train_RM_house9_fcv, class) == "character"])
+ test_RM_house9_fcv_char <- (test_RM_house9_fcv[, sapply(test_RM_house9_fcv, class) == "character"])
+  train_RM_house9_fcv_num <- (train_RM_house9_fcv[, sapply(train_RM_house9_fcv, class) != "character"])
+ test_RM_house9_fcv_num <- (test_RM_house9_fcv[, sapply(test_RM_house9_fcv, class) != "character"])
+ 
+ 
+ 
+ train_RM_house9_fcv_char_dt <- (train_RM_house9_fcv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value))%>%mutate(in_train = "yes")
+ 
+ 
+ test_RM_house9_fcv_char_dt <- test_RM_house9_fcv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value)
+  
+  
+train_RM_house9_fcv_char_miss <- left_join(test_RM_house9_fcv_char_dt,train_RM_house9_fcv_char_dt,by=c("variable"="variable","value"="value"))%>%filter(is.na(in_train)==TRUE)
+
+
+for(j in 1:nrow(train_RM_house9_fcv_char_miss))
+{
+test_RM_house9_fcv_char[[toString(train_RM_house9_fcv_char_miss[j,1])]] <- str_replace_all(test_RM_house9_fcv_char[[toString(train_RM_house9_fcv_char_miss[j,1])]],toString(train_RM_house9_fcv_char_miss[j,2]),'NA')
+} 
+  
+
+
+train_RM_house9_fcv <- cbind(train_RM_house9_fcv_num ,train_RM_house9_fcv_char)  
+test_RM_house9_fcv <- cbind(test_RM_house9_fcv_num ,test_RM_house9_fcv_char) 
+
+  
+library(MASS) 
+housefit1fcv <- lm(SalePrice ~ ., data = train_RM_house9_fcv)
+housefit2fcv <- lm(SalePrice ~ 1, data = train_RM_house9_fcv)
+
+housefit_forward_cv <- stepAIC(housefit2fcv,direction="forward",scope=list(upper=housefit1fcv,lower=housefit2fcv))
+
+detach("package:MASS", unload=TRUE)  
+  
+train_RM_model_summary_house9_fcv <- summary(housefit_forward_cv)
+train_RM_model_house9_fcv_confint <-  confint(housefit_forward_cv)
+  
+ train_RM_Preds_house9_fcv = predict(housefit_forward_cv, newdata = train_RM_house9_fcv) 
+ test_RM_Preds_house9_fcv = predict(housefit_forward_cv, newdata = test_RM_house9_fcv)  
+  
+ 
+ 
+ 
+#adjRsquare and RMSE of training set
+ train_AdjR_RM_house9_fcv = train_RM_model_summary_house9_fcv$adj.r.squared
+ train_RMSE_RM_house9_fcv = rmse(train_RM_house9_fcv$SalePrice, train_RM_Preds_house9_fcv)  
+  
+test_RM_residuals_house9_fcv <- test_RM_house9_fcv$SalePrice-test_RM_Preds_house9_fcv 
+  
+ n_test_house9_fcv=length(test_RM_house9_fcv$SalePrice)
+k_test_house9_fcv=length(housefit_forward_cv$coefficients)-1 #Subtract one to ignore intercept
+SSE_test_house9_fcv=sum(test_RM_residuals_house9_fcv**2)
+SSyy_test_house9_fcv=sum((test_RM_house9_fcv $SalePrice-mean(test_RM_house9_fcv$SalePrice))**2)
+test_AdjR_house9_fcv <- 1-(SSE_test_house9_fcv/SSyy_test_house9_fcv)*(n_test_house9_fcv-1)/(n_test_house9_fcv-(k_test_house9_fcv+1))
+ 
+
+test_AdjR_RM_house9_fcv = test_AdjR_house9_fcv
+test_RMSE_RM_house9_fcv = rmse(test_RM_house9_fcv$SalePrice,test_RM_Preds_house9_fcv) 
+  
+``` 
+  
+  
+# Analysis 2 backward cross validation
+
+```{r message=FALSE, warning=FALSE}
+
+library(e1071)
+library(class)
+library(caret)
+#install.packages("Metrics")
+library(Metrics)
+library(tidyverse)
+
+
+set.seed(4) # set seed for reproduceable results
+splitPerc_house_bcv = .7 #Training / Test split Percentage
+
+#assign test and training set
+  trainIndices_RM_house9_bcv = sample(1:dim(house8)[1],round(splitPerc_house_bcv * dim(house8)[1]))
+  train_RM_house9_bcv = house8[trainIndices_RM_house9_bcv,]
+  test_RM_house9_bcv = house8[-trainIndices_RM_house9_bcv,]
+
+  
+train_RM_house9_bcv <- rbind(train_RM_house9_bcv,setNames(fill1,names(train_RM_house9_bcv)))
+train_RM_house9_bcv[is.na(train_RM_house9_bcv)] = "NA"
+
+test_RM_house9_bcv <- rbind(test_RM_house9_bcv,setNames(fill1,names(test_RM_house9_bcv)))
+test_RM_house9_bcv[is.na(test_RM_house9_bcv)] = "NA"
+  
+  
+
+    
+ train_RM_house9_bcv_char <- (train_RM_house9_bcv[, sapply(train_RM_house9_bcv, class) == "character"])
+ test_RM_house9_bcv_char <- (test_RM_house9_bcv[, sapply(test_RM_house9_bcv, class) == "character"])
+  train_RM_house9_bcv_num <- (train_RM_house9_bcv[, sapply(train_RM_house9_bcv, class) != "character"])
+ test_RM_house9_bcv_num <- (test_RM_house9_bcv[, sapply(test_RM_house9_bcv, class) != "character"])
+ 
+ 
+ 
+ train_RM_house9_bcv_char_dt <- (train_RM_house9_bcv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value))%>%mutate(in_train = "yes")
+ 
+ 
+ test_RM_house9_bcv_char_dt <- test_RM_house9_bcv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value)
+  
+  
+train_RM_house9_bcv_char_miss <- left_join(test_RM_house9_bcv_char_dt,train_RM_house9_bcv_char_dt,by=c("variable"="variable","value"="value"))%>%filter(is.na(in_train)==TRUE)
+
+
+for(j in 1:nrow(train_RM_house9_bcv_char_miss))
+{
+test_RM_house9_bcv_char[[toString(train_RM_house9_bcv_char_miss[j,1])]] <- str_replace_all(test_RM_house9_bcv_char[[toString(train_RM_house9_bcv_char_miss[j,1])]],toString(train_RM_house9_bcv_char_miss[j,2]),'NA')
+} 
+  
+
+
+train_RM_house9_bcv <- cbind(train_RM_house9_bcv_num ,train_RM_house9_bcv_char)  
+test_RM_house9_bcv <- cbind(test_RM_house9_bcv_num ,test_RM_house9_bcv_char) 
+
+  
+library(MASS) 
+housefit1bcv <- lm(SalePrice ~ ., data = train_RM_house9_bcv)
+housefit2bcv <- lm(SalePrice ~ 1, data = train_RM_house9_bcv)
+
+housefit_backward_cv <- stepAIC(housefit1bcv,direction="backward")
+
+detach("package:MASS", unload=TRUE)  
+  
+train_RM_model_summary_house9_bcv <- summary(housefit_backward_cv)
+train_RM_model_house9_bcv_confint <-  confint(housefit_backward_cv)
+  
+ train_RM_Preds_house9_bcv = predict(housefit_backward_cv, newdata = train_RM_house9_bcv) 
+ test_RM_Preds_house9_bcv = predict(housefit_backward_cv, newdata = test_RM_house9_bcv)  
+  
+ 
+ 
+ 
+#adjRsquare and RMSE of training set
+ train_AdjR_RM_house9_bcv = train_RM_model_summary_house9_bcv$adj.r.squared
+ train_RMSE_RM_house9_bcv = rmse(train_RM_house9_bcv$SalePrice, train_RM_Preds_house9_bcv)  
+  
+test_RM_residuals_house9_bcv <- test_RM_house9_bcv$SalePrice-test_RM_Preds_house9_bcv 
+  
+ n_test_house9_bcv=length(test_RM_house9_bcv$SalePrice)
+k_test_house9_bcv=length(housefit_backward_cv$coefficients)-1 #Subtract one to ignore intercept
+SSE_test_house9_bcv=sum(test_RM_residuals_house9_bcv**2)
+SSyy_test_house9_bcv=sum((test_RM_house9_bcv $SalePrice-mean(test_RM_house9_bcv$SalePrice))**2)
+test_AdjR_house9_bcv <- 1-(SSE_test_house9_bcv/SSyy_test_house9_bcv)*(n_test_house9_bcv-1)/(n_test_house9_bcv-(k_test_house9_bcv+1))
+ 
+
+test_AdjR_RM_house9_bcv = test_AdjR_house9_bcv
+test_RMSE_RM_house9_bcv = rmse(test_RM_house9_bcv$SalePrice,test_RM_Preds_house9_bcv) 
+  
+```   
+
+# Analysis 3 stepwise cross validation
+
+```{r message=FALSE, warning=FALSE}
+
+library(e1071)
+library(class)
+library(caret)
+#install.packages("Metrics")
+library(Metrics)
+library(tidyverse)
+
+
+set.seed(4) # set seed for reproduceable results
+splitPerc_house_scv = .7 #Training / Test split Percentage
+
+#assign test and training set
+  trainIndices_RM_house9_scv = sample(1:dim(house8)[1],round(splitPerc_house_scv * dim(house8)[1]))
+  train_RM_house9_scv = house8[trainIndices_RM_house9_scv,]
+  test_RM_house9_scv = house8[-trainIndices_RM_house9_scv,]
+
+  
+train_RM_house9_scv <- rbind(train_RM_house9_scv,setNames(fill1,names(train_RM_house9_scv)))
+train_RM_house9_scv[is.na(train_RM_house9_scv)] = "NA"
+
+test_RM_house9_scv <- rbind(test_RM_house9_scv,setNames(fill1,names(test_RM_house9_scv)))
+test_RM_house9_scv[is.na(test_RM_house9_scv)] = "NA"
+  
+  
+
+    
+ train_RM_house9_scv_char <- (train_RM_house9_scv[, sapply(train_RM_house9_scv, class) == "character"])
+ test_RM_house9_scv_char <- (test_RM_house9_scv[, sapply(test_RM_house9_scv, class) == "character"])
+  train_RM_house9_scv_num <- (train_RM_house9_scv[, sapply(train_RM_house9_scv, class) != "character"])
+ test_RM_house9_scv_num <- (test_RM_house9_scv[, sapply(test_RM_house9_scv, class) != "character"])
+ 
+ 
+ 
+ train_RM_house9_scv_char_dt <- (train_RM_house9_scv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value))%>%mutate(in_train = "yes")
+ 
+ 
+ test_RM_house9_scv_char_dt <- test_RM_house9_scv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value)
+  
+  
+train_RM_house9_scv_char_miss <- left_join(test_RM_house9_scv_char_dt,train_RM_house9_scv_char_dt,by=c("variable"="variable","value"="value"))%>%filter(is.na(in_train)==TRUE)
+
+
+for(j in 1:nrow(train_RM_house9_scv_char_miss))
+{
+test_RM_house9_scv_char[[toString(train_RM_house9_scv_char_miss[j,1])]] <- str_replace_all(test_RM_house9_scv_char[[toString(train_RM_house9_scv_char_miss[j,1])]],toString(train_RM_house9_scv_char_miss[j,2]),'NA')
+} 
+  
+
+
+train_RM_house9_scv <- cbind(train_RM_house9_scv_num ,train_RM_house9_scv_char)  
+test_RM_house9_scv <- cbind(test_RM_house9_scv_num ,test_RM_house9_scv_char) 
+
+
+
+  
+library(MASS) 
+housefit1scv <- lm(SalePrice ~ ., data = train_RM_house9_scv)
+housefit2scv <- lm(SalePrice ~ 1, data = train_RM_house9_scv)
+
+
+
+housefit_step_cv  <- stepAIC(housefit2scv,direction="both",scope=list(upper=housefit1scv,lower=housefit2scv))
+
+detach("package:MASS", unload=TRUE)  
+  
+train_RM_model_summary_house9_scv <- summary(housefit_step_cv)
+train_RM_model_house9_scv_confint <-  confint(housefit_step_cv)
+  
+ train_RM_Preds_house9_scv = predict(housefit_step_cv, newdata = train_RM_house9_scv) 
+ test_RM_Preds_house9_scv = predict(housefit_step_cv, newdata = test_RM_house9_scv)  
+  
+ 
+ 
+ 
+#adjRsquare and RMSE of training set
+ train_AdjR_RM_house9_scv = train_RM_model_summary_house9_scv$adj.r.squared
+ train_RMSE_RM_house9_scv = rmse(train_RM_house9_scv$SalePrice, train_RM_Preds_house9_scv)  
+  
+test_RM_residuals_house9_scv <- test_RM_house9_scv$SalePrice-test_RM_Preds_house9_scv 
+  
+ n_test_house9_scv=length(test_RM_house9_scv$SalePrice)
+k_test_house9_scv=length(housefit_step_cv$coefficients)-1 #Subtract one to ignore intercept
+SSE_test_house9_scv=sum(test_RM_residuals_house9_scv**2)
+SSyy_test_house9_scv=sum((test_RM_house9_scv $SalePrice-mean(test_RM_house9_scv$SalePrice))**2)
+test_AdjR_house9_scv <- 1-(SSE_test_house9_scv/SSyy_test_house9_scv)*(n_test_house9_scv-1)/(n_test_house9_scv-(k_test_house9_scv+1))
+ 
+
+test_AdjR_RM_house9_scv = test_AdjR_house9_scv
+test_RMSE_RM_house9_scv = rmse(test_RM_house9_scv$SalePrice,test_RM_Preds_house9_scv) 
+  
+```     
+
+
+# Analysis 3 custom cross validation
+
+```{r message=FALSE, warning=FALSE}
+
+library(e1071)
+library(class)
+library(caret)
+#install.packages("Metrics")
+library(Metrics)
+library(tidyverse)
+
+
+set.seed(4) # set seed for reproduceable results
+splitPerc_house_ccv = .7 #Training / Test split Percentage
+
+#assign test and training set
+  trainIndices_RM_house9_ccv = sample(1:dim(house8)[1],round(splitPerc_house_ccv * dim(house8)[1]))
+  train_RM_house9_ccv = house8[trainIndices_RM_house9_ccv,]
+  test_RM_house9_ccv = house8[-trainIndices_RM_house9_ccv,]
+
+  
+train_RM_house9_ccv <- rbind(train_RM_house9_ccv,setNames(fill1,names(train_RM_house9_ccv)))
+train_RM_house9_ccv[is.na(train_RM_house9_ccv)] = "NA"
+
+test_RM_house9_ccv <- rbind(test_RM_house9_ccv,setNames(fill1,names(test_RM_house9_ccv)))
+test_RM_house9_ccv[is.na(test_RM_house9_ccv)] = "NA"
+  
+  
+
+    
+ train_RM_house9_ccv_char <- (train_RM_house9_ccv[, sapply(train_RM_house9_ccv, class) == "character"])
+ test_RM_house9_ccv_char <- (test_RM_house9_ccv[, sapply(test_RM_house9_ccv, class) == "character"])
+  train_RM_house9_ccv_num <- (train_RM_house9_ccv[, sapply(train_RM_house9_ccv, class) != "character"])
+ test_RM_house9_ccv_num <- (test_RM_house9_ccv[, sapply(test_RM_house9_ccv, class) != "character"])
+ 
+ 
+ 
+ train_RM_house9_ccv_char_dt <- (train_RM_house9_ccv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value))%>%mutate(in_train = "yes")
+ 
+ 
+ test_RM_house9_ccv_char_dt <- test_RM_house9_ccv_char%>%mutate(
+ id=row_number())%>%
+  pivot_longer(!id,names_to = 'variable',values_to='value')%>%distinct(variable,value)
+  
+  
+train_RM_house9_ccv_char_miss <- left_join(test_RM_house9_ccv_char_dt,train_RM_house9_ccv_char_dt,by=c("variable"="variable","value"="value"))%>%filter(is.na(in_train)==TRUE)
+
+
+for(j in 1:nrow(train_RM_house9_ccv_char_miss))
+{
+test_RM_house9_ccv_char[[toString(train_RM_house9_ccv_char_miss[j,1])]] <- str_replace_all(test_RM_house9_ccv_char[[toString(train_RM_house9_ccv_char_miss[j,1])]],toString(train_RM_house9_ccv_char_miss[j,2]),'NA')
+} 
+  
+
+
+train_RM_house9_ccv <- cbind(train_RM_house9_ccv_num ,train_RM_house9_ccv_char)  
+test_RM_house9_ccv <- cbind(test_RM_house9_ccv_num ,test_RM_house9_ccv_char) 
+
+
+
+  
+library(MASS) 
+housefit1ccv <- lm(SalePrice ~ ., data = train_RM_house9_ccv)
+housefit2ccv <- lm(SalePrice ~ 1, data = train_RM_house9_ccv)
+
+
+
+housefit_custom_cv <- lm(formula = SalePrice ~ 
+                       OverallQual+GrLivArea+GarageCars+GarageArea+TotalBsmtSF+`1stFlrSF`+FullBath+TotRmsAbvGrd+YearBuilt+YearRemodAdd+
+                     Neighborhood+Exterior2nd+Exterior1st+Condition1+SaleType+Condition2+HouseStyle+RoofMatl+BsmtFinType1+BsmtFinType2
+                     
+                     , data = train_RM_house9_ccv)
+
+
+
+
+#housefit_step_cv  <- stepAIC(housefit2scv,direction="both",scope=list(upper=housefit1scv,lower=housefit2scv))
+
+detach("package:MASS", unload=TRUE)  
+  
+train_RM_model_summary_house9_ccv <- summary(housefit_custom_cv)
+train_RM_model_house9_ccv_confint <-  confint(housefit_custom_cv)
+  
+ train_RM_Preds_house9_ccv = predict(housefit_custom_cv, newdata = train_RM_house9_ccv) 
+ test_RM_Preds_house9_ccv = predict(housefit_custom_cv, newdata = test_RM_house9_ccv)  
+  
+ 
+ 
+ 
+#adjRsquare and RMSE of training set
+ train_AdjR_RM_house9_ccv = train_RM_model_summary_house9_ccv$adj.r.squared
+ train_RMSE_RM_house9_ccv = rmse(train_RM_house9_ccv$SalePrice, train_RM_Preds_house9_ccv)  
+  
+test_RM_residuals_house9_ccv <- test_RM_house9_ccv$SalePrice-test_RM_Preds_house9_ccv 
+  
+ n_test_house9_ccv=length(test_RM_house9_ccv$SalePrice)
+k_test_house9_ccv=length(housefit_custom_cv$coefficients)-1 #Subtract one to ignore intercept
+SSE_test_house9_ccv=sum(test_RM_residuals_house9_ccv**2)
+SSyy_test_house9_ccv=sum((test_RM_house9_ccv $SalePrice-mean(test_RM_house9_ccv$SalePrice))**2)
+test_AdjR_house9_ccv <- 1-(SSE_test_house9_ccv/SSyy_test_house9_ccv)*(n_test_house9_ccv-1)/(n_test_house9_ccv-(k_test_house9_ccv+1))
+ 
+
+test_AdjR_RM_house9_ccv = test_AdjR_house9_ccv
+test_RMSE_RM_house9_ccv = rmse(test_RM_house9_ccv$SalePrice,test_RM_Preds_house9_ccv) 
+
+
+``` 
+# Analysis 2 Kaggle prep
+```{r message=FALSE, warning=FALSE}
+
+house_test
+house3_test <- house_test
+#sets NA values of numbers = 0
+house5_test <- (house3_test[, sapply(house3_test, class) != "character"])
+house5_test[is.na(house5_test)] = 0
+#sets NA values of characters as "NA", making it a level
+house6_test <- (house3_test[, sapply(house3_test, class) == "character"])
+house6_test[is.na(house6_test)] = "NA"
+#bind the two datasets together
+house8_test <- cbind(house5_test,house6_test)
+
+
+
+
+housefit_forward_preds = predict(housefit_forward, newdata = house8_test)
+housefit_backward_preds = predict(housefit_backward, newdata = house8_test)
+housefit_stepwise_preds = predict(housefit_stepwise, newdata = house8_test)
+housefitcustom_preds = predict(housefitcustom, newdata = house8_test)
+
+kagl_forward <- data.frame(house8_test$Id, SalePrice = housefit_forward_preds)
+kagl_backward <- data.frame(house8_test$Id, SalePrice = housefit_backward_preds)
+kagl_stepwise <- data.frame(house8_test$Id, SalePrice = housefit_stepwise_preds)
+kagl_custom <- data.frame(house8_test$Id, SalePrice = housefitcustom_preds)
+
+
+
+write.csv(kagl_forward,"C:\\Users\\zzaik\\Desktop\\kagl_forward.csv")
+write.csv(kagl_backward,"C:\\Users\\zzaik\\Desktop\\kagl_backward.csv")
+write.csv(kagl_stepwise,"C:\\Users\\zzaik\\Desktop\\kagl_stepwise.csv")
+write.csv(kagl_custom,"C:\\Users\\zzaik\\Desktop\\kagl_custom.csv")
+
+
+```
+  
+  
+ 
+
+# Analysis Two Final summary
+```{r message=FALSE, warning=FALSE}
+
+
+
+#model results
+data.frame(
+Model = c("Forward","Backward","Stepwise","Custom")  
+
+,`Adj_R2` = c(housefit_forward_summary$adj.r.squared,housefit_backward_summary$adj.r.squared,housefit_stepwise_summary$adj.r.squared,housefitcustom_summary$adj.r.squared)
+
+,'RSE' = c(housefit_forward_summary$sigma,housefit_backward_summary$sigma,housefit_stepwise_summary$sigma,housefitcustom_summary$sigma)
+
+
+
+,'RMSE' = c(   sqrt(mean(residuals(housefit_forward)^2)),sqrt(mean(residuals(housefit_backward)^2))   , sqrt(mean(residuals(housefit_stepwise)^2) ), sqrt(mean(residuals(housefitcustom)^2) )  )
+
+,Kaggle_Score = c(.17706,.25534,.17780,.44586)
+
+,`Train_Adj_R2` = c(train_AdjR_RM_house9_fcv,train_AdjR_RM_house9_bcv,train_AdjR_RM_house9_scv,train_AdjR_RM_house9_ccv)
+,`Test_Adj_R2` = c(test_AdjR_RM_house9_fcv,test_AdjR_RM_house9_bcv,test_AdjR_RM_house9_scv,test_AdjR_RM_house9_ccv)
+,Train_RMSE = c(train_RMSE_RM_house9_fcv,train_RMSE_RM_house9_bcv ,train_RMSE_RM_house9_scv ,train_RMSE_RM_house9_ccv )
+,Test_RMSE = c(test_RMSE_RM_house9_fcv,test_RMSE_RM_house9_bcv ,test_RMSE_RM_house9_scv ,test_RMSE_RM_house9_ccv )
+)%>%
+ kbl() %>%
+  kable_classic_2(full_width = F)%>%
+  add_header_above(c("Comparing Competing Models and 70/30 Training/Test CV Press" = 9))
+
+
+
+
 
 ```
